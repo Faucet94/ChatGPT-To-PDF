@@ -27,11 +27,11 @@ export function validateAndNormalize(payload: unknown): PdfJob {
     title: result.data.title,
     template: result.data.template,
     format: result.data.format,
-    margin: result.data.margin ?? {
-      top: '20mm',
-      right: '15mm',
-      bottom: '20mm',
-      left: '15mm',
+    margin: {
+      top: result.data.margin?.top ?? '20mm',
+      right: result.data.margin?.right ?? '15mm',
+      bottom: result.data.margin?.bottom ?? '20mm',
+      left: result.data.margin?.left ?? '15mm',
     },
   }
 }
