@@ -1,0 +1,13 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "packages/core" },
+    { "path": "packages/queue" },
+    { "path": "packages/renderer" },
+    { "path": "packages/templates" },
+    { "path": "packages/storage" },
+    { "path": "apps/api" },
+    { "path": "apps/worker" }
+  ]
+}
