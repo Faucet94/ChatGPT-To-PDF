@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w packages/shared && npm run build --workspaces",
+    "build": "npm run build -w packages/shared -w packages/core -w packages/queue -w packages/renderer -w packages/storage -w packages/templates && npm run build -w apps/api -w apps/worker",
     "dev:api": "npm run dev -w apps/api",
     "dev:worker": "npm run dev -w apps/worker",
     "start:api": "npm run start -w apps/api",
