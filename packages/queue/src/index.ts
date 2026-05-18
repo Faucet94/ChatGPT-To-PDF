@@ -7,9 +7,18 @@ function getRedisUrl(): string {
   return process.env.REDIS_URL ?? 'redis://localhost:6379'
 }
 
+function getRedisConnection() {
+  const url = getRedisUrl()
+  const useTLS = url.startsWith('rediss://')
+  return {
+    url,
+    ...(useTLS ? { tls: { rejectUnauthorized: false } } : {}),
+  }
+}
+
 export function createQueue(): Queue {
   return new Queue(QUEUE_NAME, {
-    connection: { url: getRedisUrl() },
+    connection: getRedisConnection(),
   })
 }
 
@@ -20,7 +29,7 @@ export function createWorker(
   return new Worker(QUEUE_NAME, async (job: Job) => {
     await processor(job.data as PdfJob)
   }, {
-    connection: { url: getRedisUrl() },
+    connection: getRedisConnection(),
     concurrency,
   })
 }

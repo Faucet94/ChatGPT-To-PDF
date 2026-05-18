@@ -17,7 +17,7 @@ server.get('/health', healthRoute)
 server.post('/generate', generateRoute)
 server.get('/status/:jobId', statusRoute)
 
-const port = parseInt(process.env.PORT ?? '3000')
+const port = parseInt(process.env.PORT ?? '3014')
 server.listen({ port, host: '0.0.0.0' }, (err) => {
   if (err) {
     server.log.error(err)
