@@ -1,5 +1,6 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
+import formbody from '@fastify/formbody'
 import { healthRoute } from './routes/health'
 import { generateRoute } from './routes/generate'
 import { statusRoute } from './routes/status'

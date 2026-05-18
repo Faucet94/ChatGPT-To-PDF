@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",
+    "@fastify/formbody": "^8.0.2",
     "@html-to-pdf/core": "1.0.0",
     "@html-to-pdf/queue": "1.0.0",
     "@html-to-pdf/shared": "1.0.0",
