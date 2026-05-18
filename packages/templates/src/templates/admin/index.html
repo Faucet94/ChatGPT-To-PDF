@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{TITLE}} — Admin Dashboard</title>
+    <style>{{CSS}}</style>
+  </head>
+  <body>
+    <div class="admin-layout">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="logo">📄 PDF Engine</div>
+          <div class="version">v{{VERSION}}</div>
+        </div>
+        <nav class="sidebar-nav">
+          <a href="/admin" class="nav-item active" data-page="overview">
+            <span class="nav-icon">📊</span> Visão Geral
+          </a>
+          <a href="/admin?page=jobs" class="nav-item" data-page="jobs">
+            <span class="nav-icon">📋</span> Jobs
+          </a>
+          <a href="/admin?page=redis" class="nav-item" data-page="redis">
+            <span class="nav-icon">🗄️</span> Redis
+          </a>
+          <a href="/admin?page=logs" class="nav-item" data-page="logs">
+            <span class="nav-icon">📝</span> Logs
+          </a>
+          <a href="/health" class="nav-item" target="_blank">
+            <span class="nav-icon">🔗</span> API Health
+          </a>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="status-indicator {{STATUS_CLASS}}" id="status-dot"></div>
+          <span id="status-text">{{STATUS_TEXT}}</span>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <h1 class="page-title">{{PAGE_TITLE}}</h1>
+          <div class="topbar-actions">
+            <button class="btn btn-sm" onclick="refreshData()">🔄 Atualizar</button>
+          </div>
+        </header>
+
+        <div class="content-body">
+          <!-- Overview Page -->
+          <div class="page" id="page-overview">
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-icon">📄</div>
+                <div class="stat-info">
+                  <div class="stat-value" id="stat-jobs-total">—</div>
+                  <div class="stat-label">Total de Jobs</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon">✅</div>
+                <div class="stat-info">
+                  <div class="stat-value" id="stat-jobs-completed">—</div>
+                  <div class="stat-label">Concluídos</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon">⏳</div>
+                <div class="stat-info">
+                  <div class="stat-value" id="stat-jobs-pending">—</div>
+                  <div class="stat-label">Pendentes</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon">❌</div>
+                <div class="stat-info">
+                  <div class="stat-value" id="stat-jobs-failed">—</div>
+                  <div class="stat-label">Falhos</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h3>🔄 Últimas Atividades</h3>
+              </div>
+              <div class="card-body">
+                <table class="table" id="recent-jobs-table">
+                  <thead>
+                    <tr>
+                      <th>Job ID</th>
+                      <th>Status</th>
+                      <th>Data</th>
+                    </tr>
+                  </thead>
+                  <tbody id="recent-jobs-body">
+                    <tr><td colspan="3" class="text-muted">Carregando...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h3>🔧 Informações do Servidor</h3>
+              </div>
+              <div class="card-body">
+                <table class="table info-table">
+                  <tbody>
+                    <tr><td>Serviço</td><td>html-to-pdf-engine</td></tr>
+                    <tr><td>Versão</td><td>{{VERSION}}</td></tr>
+                    <tr><td>Ambiente</td><td>{{ENVIRONMENT}}</td></tr>
+                    <tr><td>Servidor</td><td id="server-hostname">—</td></tr>
+                    <tr><td>Uptime</td><td id="server-uptime">—</td></tr>
+                    <tr><td>Redis</td><td id="redis-status">Verificando...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Jobs Page -->
+          <div class="page" id="page-jobs" style="display:none;">
+            <div class="card">
+              <div class="card-header">
+                <h3>📋 Todos os Jobs</h3>
+              </div>
+              <div class="card-body">
+                <table class="table" id="all-jobs-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Status</th>
+                      <th>Progresso</th>
+                      <th>Criado em</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="all-jobs-body">
+                    <tr><td colspan="5" class="text-muted">Carregando...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Redis Page -->
+          <div class="page" id="page-redis" style="display:none;">
+            <div class="card">
+              <div class="card-header">
+                <h3>🗄️ Status do Redis</h3>
+              </div>
+              <div class="card-body">
+                <div id="redis-info">
+                  <p class="text-muted">Carregando informações do Redis...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Logs Page -->
+          <div class="page" id="page-logs" style="display:none;">
+            <div class="card">
+              <div class="card-header">
+                <h3>📝 Logs do Servidor</h3>
+              </div>
+              <div class="card-body">
+                <div class="logs-container" id="logs-container">
+                  <p class="text-muted">Nenhum log disponível.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script>
+    const API_BASE = '{{API_BASE}}';
+
+    function getQueryParam(name) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(name);
+    }
+
+    function switchPage(page) {
+      document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+      const pageEl = document.getElementById(`page-${page}`);
+      if (pageEl) pageEl.style.display = 'block';
+
+      const navEl = document.querySelector(`.nav-item[data-page="${page}"]`);
+      if (navEl) navEl.classList.add('active');
+
+      const titles = { overview: '📊 Visão Geral', jobs: '📋 Jobs', redis: '🗄️ Redis', logs: '📝 Logs' };
+      document.querySelector('.page-title').textContent = titles[page] || '📊 Visão Geral';
+    }
+
+    async function fetchAPI(endpoint) {
+      try {
+        const res = await fetch(`${API_BASE}${endpoint}`);
+        if (!res.ok) return null;
+        return await res.json();
+      } catch {
+        return null;
+      }
+    }
+
+    function formatDate(ts) {
+      if (!ts) return '—';
+      return new Date(ts).toLocaleString('pt-BR');
+    }
+
+    function getStatusBadge(status) {
+      const map = {
+        completed: '<span class="badge badge-success">✅ Concluído</span>',
+        pending: '<span class="badge badge-warning">⏳ Pendente</span>',
+        processing: '<span class="badge badge-info">🔄 Processando</span>',
+        failed: '<span class="badge badge-error">❌ Falhou</span>'
+      };
+      return map[status] || `<span class="badge">${status}</span>`;
+    }
+
+    async function refreshData() {
+      const health = await fetchAPI('/health');
+      if (health) {
+        document.getElementById('server-uptime').textContent = health.uptime?.formatted || '—';
+        document.getElementById('server-hostname').textContent = health.hostname || '—';
+
+        const metrics = health.metrics || {};
+        document.getElementById('stat-jobs-total').textContent = metrics.total || '0';
+        document.getElementById('stat-jobs-completed').textContent = metrics.completed || '0';
+        document.getElementById('stat-jobs-pending').textContent = metrics.pending || '0';
+        document.getElementById('stat-jobs-failed').textContent = metrics.failed || '0';
+      }
+
+      // Load recent jobs
+      const jobsList = await fetchAPI('/admin/api/jobs?limit=20');
+      const tbody = document.getElementById('recent-jobs-body');
+      if (jobsList && jobsList.length > 0) {
+        tbody.innerHTML = jobsList.map(j => `
+          <tr>
+            <td><code>${j.id || j.jobId || '—'}</code></td>
+            <td>${getStatusBadge(j.status || j.state)}</td>
+            <td>${formatDate(j.createdAt || j.timestamp)}</td>
+          </tr>
+        `).join('');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-muted">Nenhum job encontrado.</td></tr>';
+      }
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      const page = getQueryParam('page') || 'overview';
+      switchPage(page);
+      refreshData();
+      setInterval(refreshData, 30000);
+    });
+    </script>
+  </body>
+</html>
