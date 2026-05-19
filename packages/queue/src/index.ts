@@ -9,7 +9,7 @@ function getRedisUrl(): string {
 
 function getRedisConnection() {
   const url = getRedisUrl()
-  const useTLS = url.startsWith('rediss://')
+  const useTLS = url.startsWith('redis://')
   return {
     url,
     ...(useTLS ? { tls: { rejectUnauthorized: false } } : {}),

@@ -96,7 +96,7 @@ const activeTokens = new Set<string>()
 const tokenExpiry = new Map<string, number>()
 const TOKEN_TTL = 24 * 60 * 60 * 1000
 
-const redis = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 3, connectTimeout: 5000, lazyConnect: true, ...(process.env.REDIS_URL?.startsWith('rediss://') ? { tls: { rejectUnauthorized: false } } : {}) }) : null
+const redis = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 3, connectTimeout: 5000, lazyConnect: true, ...(process.env.REDIS_URL?.startsWith('redis://') ? { tls: { rejectUnauthorized: false } } : {}) }) : null
 
 function hashToken(t: string): string { return createHash('sha256').update(t + ADMIN_SECRET).digest('hex') }
 function generateToken() {

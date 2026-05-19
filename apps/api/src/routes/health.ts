@@ -8,7 +8,7 @@ const redis = process.env.REDIS_URL
       maxRetriesPerRequest: 1,
       connectTimeout: 3000,
       lazyConnect: true,
-      ...(process.env.REDIS_URL?.startsWith('rediss://')
+      ...(process.env.REDIS_URL?.startsWith('redis://')
         ? { tls: { rejectUnauthorized: false } }
         : {}),
     })
