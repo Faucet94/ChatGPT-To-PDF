@@ -174,7 +174,8 @@
     </div>
 
     <script>
-    const API_BASE = '{{API_BASE}}';
+      const API_BASE = '{{API_BASE}}';
+      const ADMIN_API_BASE = '{{ADMIN_API_BASE}}';
 
     function getQueryParam(name) {
       const params = new URLSearchParams(window.location.search);
@@ -221,20 +222,25 @@
     }
 
     async function refreshData() {
-      const health = await fetchAPI('/health');
+      const health = await fetchAPI(`${ADMIN_API_BASE}/overview`);
       if (health) {
         document.getElementById('server-uptime').textContent = health.uptime?.formatted || '—';
         document.getElementById('server-hostname').textContent = health.hostname || '—';
+        document.getElementById('redis-status').textContent = health.redis === 'connected' ? 'Conectado' : 'Desconectado';
 
         const metrics = health.metrics || {};
         document.getElementById('stat-jobs-total').textContent = metrics.total || '0';
         document.getElementById('stat-jobs-completed').textContent = metrics.completed || '0';
         document.getElementById('stat-jobs-pending').textContent = metrics.pending || '0';
         document.getElementById('stat-jobs-failed').textContent = metrics.failed || '0';
+      } else {
+        document.getElementById('server-uptime').textContent = '—';
+        document.getElementById('server-hostname').textContent = '—';
+        document.getElementById('redis-status').textContent = 'Indisponível';
       }
 
       // Load recent jobs
-      const jobsList = await fetchAPI('/admin/api/jobs?limit=20');
+      const jobsList = await fetchAPI(`${ADMIN_API_BASE}/jobs?limit=20`);
       const tbody = document.getElementById('recent-jobs-body');
       if (jobsList && jobsList.length > 0) {
         tbody.innerHTML = jobsList.map(j => `
@@ -246,6 +252,78 @@
         `).join('');
       } else {
         tbody.innerHTML = '<tr><td colspan="3" class="text-muted">Nenhum job encontrado.</td></tr>';
+      }
+
+      const page = getQueryParam('page') || 'overview';
+      if (page === 'jobs') await loadJobs();
+      if (page === 'redis') await loadRedis();
+      if (page === 'logs') await loadLogs();
+    }
+
+    async function loadJobs() {
+      const jobs = await fetchAPI(`${ADMIN_API_BASE}/jobs?limit=100`);
+      const tbody = document.getElementById('all-jobs-body');
+      if (!tbody) return;
+
+      if (jobs && jobs.length > 0) {
+        tbody.innerHTML = jobs.map(j => {
+          const id = j.id || j.jobId || '—';
+          const status = j.status || j.state || 'unknown';
+          const url = j.url ? `<a href="${j.url}" target="_blank" rel="noopener">Abrir PDF</a>` : '—';
+          return `
+            <tr>
+              <td><code>${id}</code></td>
+              <td>${getStatusBadge(status)}</td>
+              <td>${status === 'completed' ? '100%' : status === 'failed' ? '0%' : '—'}</td>
+              <td>${formatDate(j.createdAt || j.updatedAt || j.timestamp)}</td>
+              <td>${url}</td>
+            </tr>
+          `;
+        }).join('');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-muted">Nenhum job encontrado.</td></tr>';
+      }
+    }
+
+    async function loadRedis() {
+      const redis = await fetchAPI(`${ADMIN_API_BASE}/redis`);
+      const info = document.getElementById('redis-info');
+      if (!info) return;
+
+      if (!redis) {
+        info.innerHTML = '<p class="text-muted">Não foi possível carregar informações do Redis.</p>';
+        return;
+      }
+
+      info.innerHTML = `
+        <table class="table info-table">
+          <tbody>
+            <tr><td>Status</td><td>${redis.status || 'unknown'}</td></tr>
+            <tr><td>Total de chaves</td><td>${redis.totalKeys ?? '—'}</td></tr>
+            <tr><td>Memória usada</td><td>${redis.usedMemory || '—'}</td></tr>
+            <tr><td>Clientes conectados</td><td>${redis.connectedClients || '—'}</td></tr>
+            <tr><td>Uptime</td><td>${redis.uptimeInDays || '—'} dias</td></tr>
+            <tr><td>Versão</td><td>${redis.serverVersion || '—'}</td></tr>
+          </tbody>
+        </table>
+      `;
+    }
+
+    async function loadLogs() {
+      const data = await fetchAPI(`${ADMIN_API_BASE}/logs`);
+      const container = document.getElementById('logs-container');
+      if (!container) return;
+
+      if (data?.logs?.length) {
+        container.innerHTML = data.logs.map(log => `
+          <div class="log-entry">
+            <span class="log-time">${formatDate(log.timestamp)}</span>
+            <span class="log-level">${log.level || 'info'}</span>
+            <span class="log-message">${log.message || ''}</span>
+          </div>
+        `).join('');
+      } else {
+        container.innerHTML = '<p class="text-muted">Nenhum log disponível.</p>';
       }
     }
 

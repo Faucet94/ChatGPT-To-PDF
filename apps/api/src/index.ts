@@ -4,11 +4,16 @@ import formbody from '@fastify/formbody'
 import { healthRoute } from './routes/health'
 import { generateRoute } from './routes/generate'
 import { statusRoute } from './routes/status'
-import { adminRoute, adminJobsApi, adminRedisApi, adminLogsApi, loginPageRoute, loginApiRoute, verifyTokenRoute } from './routes/admin'
+import { adminRoute, adminOverviewApi, adminJobsApi, adminRedisApi, adminLogsApi, loginPageRoute, loginApiRoute, verifyTokenRoute } from './routes/admin'
 
 const server = Fastify({
   logger: true,
 })
+
+function getAdminApiPrefix(): string {
+  const value = process.env.ADMIN_API_PREFIX || '/admin/_session'
+  return value.startsWith('/') ? value : `/${value}`
+}
 
 server.register(cors, {
   origin: true,
@@ -34,13 +39,15 @@ server.post('/generate', generateRoute)
 server.get('/status/:jobId', statusRoute)
 
 // Admin routes
+const adminApiPrefix = getAdminApiPrefix()
 server.get('/admin', adminRoute)
 server.get('/admin/login', loginPageRoute)
 server.post('/admin/login', loginApiRoute)
 server.post('/admin/verify', verifyTokenRoute)
-server.get('/admin/api/jobs', adminJobsApi)
-server.get('/admin/api/redis', adminRedisApi)
-server.get('/admin/api/logs', adminLogsApi)
+server.get(`${adminApiPrefix}/overview`, adminOverviewApi)
+server.get(`${adminApiPrefix}/jobs`, adminJobsApi)
+server.get(`${adminApiPrefix}/redis`, adminRedisApi)
+server.get(`${adminApiPrefix}/logs`, adminLogsApi)
 
 const port = parseInt(process.env.PORT ?? '3014')
 server.listen({ port, host: '0.0.0.0' }, (err) => {

@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify'
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
+import { hostname } from 'os'
 import { createRedisClient } from '@html-to-pdf/queue'
 import { createHash, randomBytes } from 'crypto'
 
@@ -11,6 +12,9 @@ const ADMIN_USER = process.env.ADMIN_USER
 const ADMIN_PASS = process.env.ADMIN_PASS
 const ADMIN_SECRET = process.env.ADMIN_SECRET || randomBytes(32).toString('hex')
 const ADMIN_CONFIGURED = Boolean(ADMIN_USER && ADMIN_PASS)
+const ADMIN_API_PREFIX = (process.env.ADMIN_API_PREFIX || '/admin/_session').startsWith('/')
+  ? process.env.ADMIN_API_PREFIX || '/admin/_session'
+  : `/${process.env.ADMIN_API_PREFIX}`
 
 // ── Proteção Anti-Fuzzing / Anti-Brute Force ────────────────
 interface RateLimitEntry {
@@ -259,10 +263,58 @@ export async function adminRoute(request: FastifyRequest, reply: FastifyReply) {
   html = replaceAll(html, '{{PAGE_TITLE}}', '📊 Visão Geral')
   html = replaceAll(html, '{{ENVIRONMENT}}', process.env.NODE_ENV || 'production')
   html = replaceAll(html, '{{API_BASE}}', apiBase)
+  html = replaceAll(html, '{{ADMIN_API_BASE}}', ADMIN_API_PREFIX)
   return reply.type('text/html').send(html)
 }
 
 // ── Admin API Endpoints ─────────────────────────────────────
+export async function adminOverviewApi(request: FastifyRequest, reply: FastifyReply) {
+  if (!await securityCheck(request, reply)) return
+  const token = getToken(request)
+  if (!token || !validateToken(token)) return reply.status(401).send({ error: 'Não autenticado' })
+
+  let redisConnected = false
+  if (redis) {
+    try {
+      await redis.ping()
+      redisConnected = true
+    } catch {}
+  }
+
+  const seconds = Math.floor((Date.now() - startTime) / 1000)
+  let jobs: Array<{ status?: string }> = []
+  if (redis) {
+    try {
+      const keys = await redis.keys('job:*')
+      const values = await Promise.all(keys.map(key => redis.get(key)))
+      jobs = values
+        .filter((value): value is string => Boolean(value))
+        .map(value => {
+          try { return JSON.parse(value) as { status?: string } } catch { return {} }
+        })
+    } catch {}
+  }
+
+  return reply.send({
+    status: 'ok',
+    version: '1.0.0',
+    hostname: hostname(),
+    environment: process.env.NODE_ENV || 'production',
+    uptime: {
+      seconds,
+      formatted: `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m ${seconds % 60}s`,
+    },
+    metrics: {
+      total: jobs.length,
+      completed: jobs.filter(job => job.status === 'completed').length,
+      pending: jobs.filter(job => job.status === 'pending').length,
+      failed: jobs.filter(job => job.status === 'failed').length,
+    },
+    redis: redisConnected ? 'connected' : 'disconnected',
+    timestamp: Date.now(),
+  })
+}
+
 export async function adminJobsApi(request: FastifyRequest, reply: FastifyReply) {
   if (!await securityCheck(request, reply)) return
   const token = getToken(request)
