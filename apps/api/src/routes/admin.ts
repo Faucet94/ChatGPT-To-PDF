@@ -98,6 +98,7 @@ const tokenExpiry = new Map<string, number>()
 const loginNonces = new Map<string, number>()
 const TOKEN_TTL = 24 * 60 * 60 * 1000
 const LOGIN_NONCE_TTL = 10 * 60 * 1000
+const ADMIN_COOKIE = 'admin_session'
 
 const redis = process.env.REDIS_URL
   ? createRedisClient({
@@ -134,9 +135,25 @@ function validateToken(t: string): boolean {
   if (!ex || Date.now() > ex) { activeTokens.delete(h); tokenExpiry.delete(h); return false }
   return true
 }
+function createSessionCookie(token: string, expiresAt: number): string {
+  const maxAge = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000))
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : ''
+  return `${ADMIN_COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/admin; Max-Age=${maxAge}${secure}`
+}
+function getCookie(r: FastifyRequest, name: string): string | null {
+  const header = r.headers.cookie
+  if (!header) return null
+  for (const part of header.split(';')) {
+    const [rawKey, ...rawValue] = part.trim().split('=')
+    if (rawKey === name) return decodeURIComponent(rawValue.join('='))
+  }
+  return null
+}
 function getToken(r: FastifyRequest): string | null {
   const a = r.headers.authorization
   if (a?.startsWith('Bearer ')) return a.slice(7)
+  const cookieToken = getCookie(r, ADMIN_COOKIE)
+  if (cookieToken) return cookieToken
   const q = r.query as Record<string, string>
   return q?.token || null
 }
@@ -208,7 +225,9 @@ export async function loginApiRoute(request: FastifyRequest, reply: FastifyReply
 
   rateLimitMap.delete(ip)
   const t = generateToken()
-  return reply.send({ token: t.token, expiresAt: t.expiresAt, user: { username: ADMIN_USER }, message: 'Autenticado com sucesso' })
+  return reply
+    .header('Set-Cookie', createSessionCookie(t.token, t.expiresAt))
+    .send({ ok: true, expiresAt: t.expiresAt, redirectTo: '/admin', message: 'Autenticado com sucesso' })
 }
 
 // ── Verify Token ────────────────────────────────────────────
@@ -262,7 +281,10 @@ export async function adminJobsApi(request: FastifyRequest, reply: FastifyReply)
   } catch { return reply.send([]) }
 }
 
-export async function adminRedisApi(_r: FastifyRequest, reply: FastifyReply) {
+export async function adminRedisApi(request: FastifyRequest, reply: FastifyReply) {
+  if (!await securityCheck(request, reply)) return
+  const token = getToken(request)
+  if (!token || !validateToken(token)) return reply.status(401).send({ error: 'Não autenticado' })
   if (!redis) return reply.send({ status: 'not_configured', message: 'REDIS_URL not configured' })
   try {
     await redis.ping()
@@ -277,6 +299,9 @@ export async function adminRedisApi(_r: FastifyRequest, reply: FastifyReply) {
   } catch (e) { return reply.send({ status: 'disconnected', message: e instanceof Error ? e.message : 'Unknown' }) }
 }
 
-export async function adminLogsApi(_r: FastifyRequest, reply: FastifyReply) {
+export async function adminLogsApi(request: FastifyRequest, reply: FastifyReply) {
+  if (!await securityCheck(request, reply)) return
+  const token = getToken(request)
+  if (!token || !validateToken(token)) return reply.status(401).send({ error: 'Não autenticado' })
   return reply.send({ logs: [{ timestamp: new Date(startTime).toISOString(), level: 'info', message: 'Server started' }, { timestamp: new Date().toISOString(), level: 'info', message: 'Admin dashboard accessed' }], total: 2 })
 }

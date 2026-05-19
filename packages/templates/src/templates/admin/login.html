@@ -201,6 +201,7 @@
 
           const response = await fetch(`${API_BASE}/admin/login`, {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
               'Content-Type': 'application/json',
             },
@@ -209,16 +210,12 @@
 
           const data = await response.json();
 
-          if (response.ok && data.token) {
-            // Success!
+          if (response.ok && data.ok) {
             keyAnim.classList.add('key-unlocked');
-            btnText.textContent = '✅ Autenticado!';
-
-            // Store token and redirect
-            localStorage.setItem('admin_token', data.token);
+            btnText.textContent = 'Entrando...';
             setTimeout(() => {
-              window.location.href = '/admin';
-            }, 800);
+              window.location.assign(data.redirectTo || '/admin');
+            }, 250);
           } else {
             showError(data.error || 'Credenciais inválidas');
             loginBtn.disabled = false;
