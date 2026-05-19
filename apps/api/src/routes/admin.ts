@@ -7,9 +7,10 @@ import { createHash, randomBytes } from 'crypto'
 const startTime = Date.now()
 
 // ── Credenciais do Admin ────────────────────────────────────
-const ADMIN_USER = process.env.ADMIN_USER || 'AdminMaster@2026!'
-const ADMIN_PASS = process.env.ADMIN_PASS || 'S3nh@Sup3rF0rt3!@#2026'
+const ADMIN_USER = process.env.ADMIN_USER
+const ADMIN_PASS = process.env.ADMIN_PASS
 const ADMIN_SECRET = process.env.ADMIN_SECRET || randomBytes(32).toString('hex')
+const ADMIN_CONFIGURED = Boolean(ADMIN_USER && ADMIN_PASS)
 
 // ── Proteção Anti-Fuzzing / Anti-Brute Force ────────────────
 interface RateLimitEntry {
@@ -94,7 +95,9 @@ function getDelay(ip: string): number {
 // ── Token Management ────────────────────────────────────────
 const activeTokens = new Set<string>()
 const tokenExpiry = new Map<string, number>()
+const loginNonces = new Map<string, number>()
 const TOKEN_TTL = 24 * 60 * 60 * 1000
+const LOGIN_NONCE_TTL = 10 * 60 * 1000
 
 const redis = process.env.REDIS_URL
   ? createRedisClient({
@@ -105,6 +108,17 @@ const redis = process.env.REDIS_URL
   : null
 
 function hashToken(t: string): string { return createHash('sha256').update(t + ADMIN_SECRET).digest('hex') }
+function createLoginNonce(): string {
+  const nonce = randomBytes(32).toString('hex')
+  loginNonces.set(nonce, Date.now() + LOGIN_NONCE_TTL)
+  setTimeout(() => loginNonces.delete(nonce), LOGIN_NONCE_TTL)
+  return nonce
+}
+function validateLoginNonce(nonce: string): boolean {
+  const expiresAt = loginNonces.get(nonce)
+  loginNonces.delete(nonce)
+  return Boolean(expiresAt && Date.now() <= expiresAt)
+}
 function generateToken() {
   const raw = randomBytes(48).toString('hex')
   const token = hashToken(raw)
@@ -151,17 +165,18 @@ async function securityCheck(r: FastifyRequest, reply: FastifyReply): Promise<bo
 // ── Login Page ──────────────────────────────────────────────
 export async function loginPageRoute(request: FastifyRequest, reply: FastifyReply) {
   if (!await securityCheck(request, reply)) return
+  if (!ADMIN_CONFIGURED) {
+    return reply.status(503).send('Admin credentials are not configured')
+  }
   let html = readTpl('login.html')
   const css = readTpl('login.css')
   const apiBase = `https://${request.headers.host || 'chatgpt-to-pdf-local.onrender.com'}`
-  const nonce = randomBytes(16).toString('hex')
-  const hash = createHash('sha256').update(nonce + ADMIN_SECRET).digest('hex').slice(0, 12)
+  const nonce = createLoginNonce()
   html = replaceAll(html, '{{TITLE}}', 'PDF Engine')
   html = replaceAll(html, '{{CSS}}', css)
   html = replaceAll(html, '{{API_BASE}}', apiBase)
   html = replaceAll(html, '{{ANIMATION_LABEL}}', '🔐 Insira suas credenciais')
   html = replaceAll(html, '{{FORM_NONCE}}', nonce)
-  html = replaceAll(html, '{{FORM_HASH}}', hash)
   return reply.type('text/html').send(html)
 }
 
@@ -169,18 +184,17 @@ export async function loginPageRoute(request: FastifyRequest, reply: FastifyRepl
 export async function loginApiRoute(request: FastifyRequest, reply: FastifyReply) {
   const ip = getClientIp(request)
   if (!await securityCheck(request, reply)) return
+  if (!ADMIN_CONFIGURED) {
+    return reply.status(503).send({ error: 'Admin credentials are not configured' })
+  }
   const body = request.body as Record<string, unknown> || {}
   const username = String(body['username'] || '')
   const password = String(body['password'] || '')
   const honeypotValue = String(body[HONEYPOT_FIELD] || '')
   const nonce = String(body['_nonce'] || '')
-  const hash = String(body['_hash'] || '')
 
   if (honeypotValue) { recordAttempt(ip, true, true); return reply.send({ token: 'invalid', message: 'ok' }) }
-  if (nonce && hash) {
-    const expected = createHash('sha256').update(nonce + ADMIN_SECRET).digest('hex').slice(0, 12)
-    if (hash !== expected) { recordAttempt(ip, true); return reply.status(401).send({ error: 'Sessão inválida. Recarregue a página.' }) }
-  }
+  if (!validateLoginNonce(nonce)) { recordAttempt(ip, true); return reply.status(401).send({ error: 'Sessão inválida. Recarregue a página.' }) }
   if (!username || !password) { recordAttempt(ip, true); return reply.status(400).send({ error: 'Usuário e senha obrigatórios' }) }
   if (hasMaliciousPayload(username) || hasMaliciousPayload(password)) { recordAttempt(ip, true); return reply.status(403).send({ error: 'Acesso negado' }) }
 
@@ -197,6 +211,7 @@ export async function loginApiRoute(request: FastifyRequest, reply: FastifyReply
 // ── Verify Token ────────────────────────────────────────────
 export async function verifyTokenRoute(request: FastifyRequest, reply: FastifyReply) {
   if (!await securityCheck(request, reply)) return
+  if (!ADMIN_CONFIGURED) return reply.redirect('/admin/login')
   const token = getToken(request)
   if (!token || !validateToken(token)) return reply.status(401).send({ valid: false, error: 'Token inválido' })
   return reply.send({ valid: true })
