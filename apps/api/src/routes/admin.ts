@@ -196,7 +196,10 @@ export async function loginApiRoute(request: FastifyRequest, reply: FastifyReply
   if (honeypotValue) { recordAttempt(ip, true, true); return reply.send({ token: 'invalid', message: 'ok' }) }
   if (!validateLoginNonce(nonce)) { recordAttempt(ip, true); return reply.status(401).send({ error: 'Sessão inválida. Recarregue a página.' }) }
   if (!username || !password) { recordAttempt(ip, true); return reply.status(400).send({ error: 'Usuário e senha obrigatórios' }) }
-  if (hasMaliciousPayload(username) || hasMaliciousPayload(password)) { recordAttempt(ip, true); return reply.status(403).send({ error: 'Acesso negado' }) }
+  if (username.length > 256 || password.length > 1024) {
+    recordAttempt(ip, true)
+    return reply.status(400).send({ error: 'Credenciais inválidas' })
+  }
 
   const delay = getDelay(ip)
   if (delay > 0) await new Promise(r => setTimeout(r, delay))
