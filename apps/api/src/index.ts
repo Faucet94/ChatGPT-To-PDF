@@ -1,4 +1,4 @@
-import Fastify from 'fastify'
+import Fastify, { FastifyRequest } from 'fastify'
 import cors from '@fastify/cors'
 import formbody from '@fastify/formbody'
 import { healthRoute } from './routes/health'
@@ -12,6 +12,20 @@ const server = Fastify({
 
 server.register(cors, {
   origin: true,
+})
+server.register(formbody)
+
+server.addContentTypeParser('text/plain', { parseAs: 'string' }, async (_request: FastifyRequest, body: string) => {
+  const text = String(body)
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { html: text }
+  }
+})
+
+server.addContentTypeParser('text/html', { parseAs: 'string' }, async (_request: FastifyRequest, body: string) => {
+  return { html: String(body) }
 })
 
 server.get('/', async () => ({ service: 'html-to-pdf-engine', version: '1.0.0' }))

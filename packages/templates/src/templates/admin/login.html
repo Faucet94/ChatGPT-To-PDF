@@ -197,12 +197,15 @@
         keyAnim.classList.add('key-inserting');
 
         try {
-          // Use FormData to include honeypot and anti-CSRF tokens
           const formData = new FormData(form);
+          const payload = Object.fromEntries(formData.entries());
 
           const response = await fetch(`${API_BASE}/admin/login`, {
             method: 'POST',
-            body: formData,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
           });
 
           const data = await response.json();
