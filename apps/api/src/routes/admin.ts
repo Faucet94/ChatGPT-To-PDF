@@ -1,7 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify'
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
-import Redis from 'ioredis'
+import { createRedisClient } from '@html-to-pdf/queue'
 import { createHash, randomBytes } from 'crypto'
 
 const startTime = Date.now()
@@ -96,7 +96,13 @@ const activeTokens = new Set<string>()
 const tokenExpiry = new Map<string, number>()
 const TOKEN_TTL = 24 * 60 * 60 * 1000
 
-const redis = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 3, connectTimeout: 5000, lazyConnect: true, ...(process.env.REDIS_URL?.startsWith('redis://') ? { tls: { rejectUnauthorized: false } } : {}) }) : null
+const redis = process.env.REDIS_URL
+  ? createRedisClient({
+      maxRetriesPerRequest: 3,
+      connectTimeout: 5000,
+      lazyConnect: true,
+    })
+  : null
 
 function hashToken(t: string): string { return createHash('sha256').update(t + ADMIN_SECRET).digest('hex') }
 function generateToken() {

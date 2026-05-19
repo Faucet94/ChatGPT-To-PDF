@@ -1,11 +1,10 @@
-import { createWorker } from '@html-to-pdf/queue'
+import { createRedisClient, createWorker } from '@html-to-pdf/queue'
 import { renderPDF } from '@html-to-pdf/renderer'
 import { renderTemplate } from '@html-to-pdf/templates'
 import { S3StorageAdapter } from '@html-to-pdf/storage'
 import { PdfJob, buildDownloadName } from '@html-to-pdf/shared'
-import Redis from 'ioredis'
 
-const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379')
+const redis = createRedisClient()
 const storage = new S3StorageAdapter()
 
 async function updateJobStatus(jobId: string, status: string, url?: string, error?: string) {

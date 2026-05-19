@@ -1,12 +1,8 @@
 import { FastifyReply, FastifyRequest } from 'fastify'
 import { JobNotFoundError } from '@html-to-pdf/shared'
-import Redis from 'ioredis'
+import { createRedisClient } from '@html-to-pdf/queue'
 
-const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
-  ...(process.env.REDIS_URL?.startsWith('redis://')
-    ? { tls: { rejectUnauthorized: false } }
-    : {}),
-})
+const redis = createRedisClient()
 
 export async function statusRoute(request: FastifyRequest, reply: FastifyReply) {
   const { jobId } = request.params as { jobId: string }

@@ -1,16 +1,13 @@
 import { FastifyReply, FastifyRequest } from 'fastify'
-import Redis from 'ioredis'
+import { createRedisClient } from '@html-to-pdf/queue'
 import { hostname } from 'os'
 
 const startTime = Date.now()
 const redis = process.env.REDIS_URL
-  ? new Redis(process.env.REDIS_URL, {
+  ? createRedisClient({
       maxRetriesPerRequest: 1,
       connectTimeout: 3000,
       lazyConnect: true,
-      ...(process.env.REDIS_URL?.startsWith('redis://')
-        ? { tls: { rejectUnauthorized: false } }
-        : {}),
     })
   : null
 

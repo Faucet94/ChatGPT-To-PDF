@@ -1,19 +1,38 @@
 import { Queue, Worker, Job } from 'bullmq'
 import { PdfJob } from '@html-to-pdf/shared'
+import Redis, { RedisOptions } from 'ioredis'
 
 const QUEUE_NAME = 'pdf-job'
 
-function getRedisUrl(): string {
+export function getRedisUrl(): string {
   return process.env.REDIS_URL ?? 'redis://localhost:6379'
 }
 
-function getRedisConnection() {
+function getRedisTlsOptions(url: string): RedisOptions {
+  const useTLS = url.startsWith('rediss://') || process.env.REDIS_TLS === 'true'
+  return useTLS ? { tls: { rejectUnauthorized: false } } : {}
+}
+
+export function getRedisConnection(): RedisOptions & { url: string } {
   const url = getRedisUrl()
-  const useTLS = url.startsWith('redis://')
   return {
     url,
-    ...(useTLS ? { tls: { rejectUnauthorized: false } } : {}),
+    ...getRedisTlsOptions(url),
   }
+}
+
+export function createRedisClient(options: RedisOptions = {}): Redis {
+  const url = getRedisUrl()
+  const redis = new Redis(url, {
+    ...getRedisTlsOptions(url),
+    ...options,
+  })
+
+  redis.on('error', (err) => {
+    console.error(`Redis connection error: ${err.message}`)
+  })
+
+  return redis
 }
 
 export function createQueue(): Queue {
